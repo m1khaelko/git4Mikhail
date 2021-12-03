@@ -3,8 +3,10 @@ package com.example.git3;
 import androidx.appcompat.app.AppCompatActivity;
 
 import android.os.Bundle;
+import android.util.Log;
 import android.view.View;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 
@@ -20,6 +22,7 @@ public class  MainActivity extends AppCompatActivity {
     private ProgressBar mProgressBar;
     TextView mTextView;
     Button button;
+    EditText editText;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -29,6 +32,7 @@ public class  MainActivity extends AppCompatActivity {
         mProgressBar = (ProgressBar) findViewById(R.id.progressBar);
         mProgressBar.setVisibility(View.INVISIBLE);
         button = findViewById(R.id.button);
+        editText = findViewById(R.id.editTextTextPersonName);
 
         button.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -36,41 +40,43 @@ public class  MainActivity extends AppCompatActivity {
                 mProgressBar.setVisibility(View.VISIBLE);
 
                 GitHubService gitHubService = GitHubService.retrofit.create(GitHubService.class);
+                // часть слова
+                final Call<GitResult> call =
+                        gitHubService.getUsers(String.valueOf(editText.getText()));
 
-                final Call<List<Repos>> call = gitHubService.getRepos("m1khaelko");
+                call.enqueue(new Callback<GitResult>() {
+                    @Override
+                    public void onResponse(Call<GitResult> call, Response<GitResult> response) {
+                        // response.isSuccessful() is true if the response code is 2xx
+                        if (response.isSuccessful()) {
+                            GitResult result = response.body();
 
-                call.enqueue(new Callback<List<Repos>>() {
-                                 @Override
-                                 public void onResponse(Call<List<Repos>> call, Response<List<Repos>> response) {
-                                     // response.isSuccessfull() is true if the response code is 2xx
-                                     if (response.isSuccessful()) {
-                                         // Выводим массив имён
-                                         mTextView.setText(response.body().toString() + "\n");
-                                         for (int i = 0; i < response.body().size(); i++) {
-                                             // Выводим имена по отдельности
-                                             mTextView.append(response.body().get(i).getName() + "\n");
-                                         }
+                            // Получаем json из github-сервера и конвертируем его в удобный вид
+                            // Покажем только первого пользователя
+                            String user = "Аккаунт Github: " + result.getItems().get(0).getLogin();
+                            mTextView.setText(user);
+                            Log.i("Git", String.valueOf(result.getItems().size()));
 
-                                         mProgressBar.setVisibility(View.INVISIBLE);
-                                     } else {
-                                         int statusCode = response.code();
-                                         // Обрабатываем ошибку
-                                         ResponseBody errorBody = response.errorBody();
-                                         try {
-                                             mTextView.setText(errorBody.string());
-                                             mProgressBar.setVisibility(View.INVISIBLE);
-                                         } catch (IOException e) {
-                                             e.printStackTrace();
-                                         }
-                                     }
-                                 }
+                            mProgressBar.setVisibility(View.INVISIBLE);
+                        } else {
+                            int statusCode = response.code();
 
-                                 @Override
-                                 public void onFailure(Call<List<Repos>> call, Throwable throwable) {
-                                     mTextView.setText("Что-то пошло не так: " + throwable.getMessage());
-                                 }
-                             }
-                );
+                            // handle request errors yourself
+                            ResponseBody errorBody = response.errorBody();
+                            try {
+                                mTextView.setText(errorBody.string());
+                                mProgressBar.setVisibility(View.INVISIBLE);
+                            } catch (IOException e) {
+                                e.printStackTrace();
+                            }
+                        }
+                    }
+
+                    @Override
+                    public void onFailure(Call<GitResult> call, Throwable throwable) {
+                        mTextView.setText("Что-то пошло не так: " + throwable.getMessage());
+                    }
+                });
             }
         });
     }
